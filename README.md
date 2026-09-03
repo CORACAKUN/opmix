@@ -28,7 +28,15 @@ Phase 3 transport playback:
 - One-shot buffer source recreation on playback restart
 - Visual timer and waveform cursor updates with `requestAnimationFrame`
 
-Metering and WAV export are planned for later phases.
+Phase 4 mixer:
+
+- Live volume and pan updates during playback
+- Mute and solo playback rules
+- Master gain routing
+- Output peak meter
+- Clipping warning
+
+WAV export is planned for a later phase.
 
 ## Run Locally
 

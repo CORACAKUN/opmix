@@ -1,6 +1,7 @@
 import './styles.css';
 import WaveSurfer from 'wavesurfer.js';
 import { decodeAudioFile, getAudioContext, resumeAudioContext } from './audio/audio-engine.js';
+import { getPeakLevel, isClipping } from './audio/meters.js';
 import { createProjectStore } from './state/project-store.js';
 import { validateAudioFile } from './utils/file-validation.js';
 import { formatTime } from './utils/format-time.js';
@@ -14,8 +15,11 @@ const trackRuntime = new Map();
 const playback = {
   animationFrameId: null,
   masterGain: null,
+  analyser: null,
+  meterData: null,
   startedAtContextTime: 0,
   startedAtProjectTime: 0,
+  clipping: false,
 };
 
 const app = document.querySelector('#app');
@@ -228,8 +232,12 @@ async function play() {
   stopSources();
 
   playback.masterGain = context.createGain();
+  playback.analyser = context.createAnalyser();
+  playback.analyser.fftSize = 2048;
+  playback.meterData = new Uint8Array(playback.analyser.fftSize);
   playback.masterGain.gain.value = state.masterVolume;
-  playback.masterGain.connect(context.destination);
+  playback.masterGain.connect(playback.analyser);
+  playback.analyser.connect(context.destination);
   playback.startedAtContextTime = context.currentTime;
   playback.startedAtProjectTime =
     state.currentTime >= state.duration ? 0 : state.currentTime;
@@ -357,6 +365,7 @@ function startVisualClock() {
     store.setCurrentTime(position);
     updateVisualTime(position);
     syncWaveformCursors(position);
+    updateMeter();
 
     if (position >= store.getState().duration) {
       stop();
@@ -374,6 +383,31 @@ function stopVisualClock() {
     cancelAnimationFrame(playback.animationFrameId);
     playback.animationFrameId = null;
   }
+}
+
+function updateMeter() {
+  const meterFill = app.querySelector('[data-meter-fill]');
+  const clippingWarning = app.querySelector('[data-clipping-warning]');
+
+  if (!meterFill || !clippingWarning) {
+    return;
+  }
+
+  if (!playback.analyser || !playback.meterData) {
+    meterFill.style.width = '0%';
+    meterFill.classList.remove('is-clipping');
+    clippingWarning.hidden = true;
+    return;
+  }
+
+  playback.analyser.getByteTimeDomainData(playback.meterData);
+  const peak = getPeakLevel(playback.meterData);
+  const clipping = isClipping(peak);
+
+  meterFill.style.width = `${Math.round(peak * 100)}%`;
+  meterFill.classList.toggle('is-clipping', clipping);
+  clippingWarning.hidden = !clipping;
+  playback.clipping = clipping;
 }
 
 function updateVisualTime(position) {
@@ -424,7 +458,12 @@ function stopSources() {
   });
 
   playback.masterGain?.disconnect();
+  playback.analyser?.disconnect();
   playback.masterGain = null;
+  playback.analyser = null;
+  playback.meterData = null;
+  playback.clipping = false;
+  updateMeter();
 }
 
 function updateMasterVolume(volume) {

@@ -51,8 +51,9 @@ export function renderTransport(
         value="${state.masterVolume}"
       />
       <div class="meter" aria-label="Output peak meter">
-        <span class="meter-fill"></span>
+        <span class="meter-fill" data-meter-fill></span>
       </div>
+      <p class="clipping-warning" data-clipping-warning hidden>Clipping</p>
     </div>
   `;
 
