@@ -36,7 +36,12 @@ Phase 4 mixer:
 - Output peak meter
 - Clipping warning
 
-WAV export is planned for a later phase.
+Phase 5 WAV export:
+
+- Offline stereo rendering
+- Export honors volume, pan, mute, solo, offsets, and master volume
+- Local WAV download with timestamped filename
+- Busy, success, and error states
 
 ## Run Locally
 

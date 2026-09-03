@@ -12,9 +12,10 @@ export function renderTransport(
 ) {
   const hasReadyTracks = state.tracks.some((track) => track.status === 'ready');
   const isPlaying = state.status === 'playing';
-  const playDisabled = !hasReadyTracks || isPlaying;
+  const isExporting = state.status === 'exporting';
+  const playDisabled = !hasReadyTracks || isPlaying || isExporting;
   const pauseDisabled = !isPlaying;
-  const stopDisabled = !hasReadyTracks;
+  const stopDisabled = !hasReadyTracks || isExporting;
 
   container.innerHTML = `
     <div>

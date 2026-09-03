@@ -8,7 +8,15 @@ const DEFAULT_TRACK_VALUES = {
   duration: 0,
   status: 'ready',
 };
-const TRANSPORT_STATUSES = new Set(['empty', 'ready', 'playing', 'paused', 'loading', 'error']);
+const TRANSPORT_STATUSES = new Set([
+  'empty',
+  'ready',
+  'playing',
+  'paused',
+  'loading',
+  'error',
+  'exporting',
+]);
 
 function createId() {
   if (globalThis.crypto?.randomUUID) {
