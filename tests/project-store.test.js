@@ -41,6 +41,16 @@ describe('project store', () => {
 
     expect(store.getState().tracks[0].name).toBe('keys.wav');
   });
+
+  it('tracks valid transport status values', () => {
+    const store = createProjectStore();
+
+    store.addTrack({ id: 'a', name: 'keys.wav', duration: 2 });
+    store.setStatus('playing');
+    store.setStatus('invalid');
+
+    expect(store.getState().status).toBe('playing');
+  });
 });
 
 describe('duration calculations', () => {
