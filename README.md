@@ -12,7 +12,15 @@ Phase 1 foundation:
 - Project state utilities
 - Initial Vitest coverage for state, duration, file validation, and mute/solo rules
 
-Audio decoding, waveform rendering, synchronized playback, metering, and WAV export are planned for later phases.
+Phase 2 import and waveform:
+
+- Browser audio decoding with the shared Web Audio context
+- Per-track object URL and decoded buffer runtime storage
+- WaveSurfer rendering for decoded tracks
+- Track removal cleanup for object URLs and waveform instances
+- Import error state for undecodable files
+
+Synchronized playback, metering, and WAV export are planned for later phases.
 
 ## Run Locally
 

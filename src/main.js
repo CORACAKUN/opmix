@@ -1,4 +1,6 @@
 import './styles.css';
+import WaveSurfer from 'wavesurfer.js';
+import { decodeAudioFile } from './audio/audio-engine.js';
 import { createProjectStore } from './state/project-store.js';
 import { validateAudioFile } from './utils/file-validation.js';
 import { formatTime } from './utils/format-time.js';
@@ -8,10 +10,11 @@ import { renderTrackList } from './components/track-view.js';
 
 const store = createProjectStore();
 const notifications = createNotifications();
+const trackRuntime = new Map();
 
 const app = document.querySelector('#app');
 
-function importFiles(fileList) {
+async function importFiles(fileList) {
   const files = Array.from(fileList);
 
   if (!files.length) {
@@ -31,18 +34,45 @@ function importFiles(fileList) {
     }
   }
 
-  accepted.forEach((file) => {
-    store.addTrack({
+  const importJobs = accepted.map(async (file) => {
+    const trackId = store.addTrack({
       name: file.name,
-      file,
       duration: 0,
-      status: 'pending',
+      status: 'loading',
     });
+
+    render();
+
+    try {
+      const audioBuffer = await decodeAudioFile(file);
+      const objectUrl = URL.createObjectURL(file);
+
+      trackRuntime.set(trackId, {
+        file,
+        audioBuffer,
+        objectUrl,
+        waveform: null,
+      });
+
+      store.updateTrack(trackId, {
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+        channelCount: audioBuffer.numberOfChannels,
+        status: 'ready',
+        error: null,
+      });
+    } catch (error) {
+      store.updateTrack(trackId, {
+        status: 'error',
+        error: error.message,
+      });
+      notifications.error(error.message);
+    }
   });
 
   if (accepted.length) {
     notifications.success(
-      `${accepted.length} file${accepted.length === 1 ? '' : 's'} queued for audio import.`,
+      `${accepted.length} file${accepted.length === 1 ? '' : 's'} queued for decoding.`,
     );
   }
 
@@ -51,10 +81,13 @@ function importFiles(fileList) {
   }
 
   render();
+  await Promise.allSettled(importJobs);
+  render();
 }
 
 function render() {
   const state = store.getState();
+  disposeWaveforms();
 
   app.innerHTML = `
     <main class="studio-shell" aria-labelledby="app-title">
@@ -85,7 +118,7 @@ function render() {
             <p>
               ${
                 state.tracks.length
-                  ? `${state.tracks.length} track${state.tracks.length === 1 ? '' : 's'} loaded.`
+                  ? `${state.tracks.length} track${state.tracks.length === 1 ? '' : 's'} in the project.`
                   : 'Import browser-decodable MP3, WAV, OGG, M4A, or other audio files.'
               }
             </p>
@@ -138,17 +171,85 @@ function render() {
     state,
     formatTime,
     onRemoveTrack: (trackId) => {
+      disposeTrackRuntime(trackId);
       store.removeTrack(trackId);
       notifications.info('Track removed.');
       render();
     },
     onTrackChange: (trackId, patch) => {
       store.updateTrack(trackId, patch);
-      render();
+
+      if ('muted' in patch || 'solo' in patch || 'offset' in patch) {
+        render();
+      }
     },
   });
 
+  mountWaveforms(state);
   notifications.render(statusRegion);
 }
+
+function mountWaveforms(state) {
+  state.tracks.forEach((track) => {
+    const runtime = trackRuntime.get(track.id);
+
+    if (!runtime?.objectUrl || track.status !== 'ready') {
+      return;
+    }
+
+    const container = app.querySelector(`[data-waveform-id="${track.id}"]`);
+
+    if (!container) {
+      return;
+    }
+
+    runtime.waveform = WaveSurfer.create({
+      container,
+      url: runtime.objectUrl,
+      height: 72,
+      waveColor: '#35d7d0',
+      progressColor: '#f5b14c',
+      cursorColor: '#eef7f6',
+      barWidth: 2,
+      barGap: 2,
+      barRadius: 2,
+      normalize: true,
+      interact: false,
+    });
+
+    runtime.waveform.on('error', (error) => {
+      store.updateTrack(track.id, {
+        status: 'error',
+        error: 'Waveform rendering failed for this file.',
+      });
+      notifications.error(error?.message ?? 'Waveform rendering failed for this file.');
+      render();
+    });
+  });
+}
+
+function disposeWaveforms() {
+  trackRuntime.forEach((runtime) => {
+    runtime.waveform?.destroy();
+    runtime.waveform = null;
+  });
+}
+
+function disposeTrackRuntime(trackId) {
+  const runtime = trackRuntime.get(trackId);
+
+  if (!runtime) {
+    return;
+  }
+
+  runtime.waveform?.destroy();
+  URL.revokeObjectURL(runtime.objectUrl);
+  trackRuntime.delete(trackId);
+}
+
+window.addEventListener('beforeunload', () => {
+  disposeWaveforms();
+  trackRuntime.forEach((_, trackId) => disposeTrackRuntime(trackId));
+});
 
 render();
