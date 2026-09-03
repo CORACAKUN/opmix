@@ -203,9 +203,21 @@ button:disabled,
   font-weight: 800;
 }
 
+.waveform,
 .waveform-placeholder {
   min-height: 72px;
   border: 1px solid rgba(53, 215, 208, 0.18);
+  background: #12191c;
+}
+
+.waveform {
+  overflow: hidden;
+}
+
+.waveform-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 12px;
   background:
     repeating-linear-gradient(
       90deg,
@@ -213,6 +225,7 @@ button:disabled,
       transparent 5px 14px
     ),
     #12191c;
+  color: #9eb2b1;
 }
 
 .track-controls {

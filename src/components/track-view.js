@@ -20,8 +20,15 @@ export function renderTrackList(
               <span class="track-name">${escapeHtml(track.name)}</span>
               <span>${formatTime(track.duration)}</span>
             </div>
-            <div class="waveform-placeholder" role="img" aria-label="Waveform placeholder"></div>
-            <p>${audible ? 'Audible' : 'Muted by mixer state'}</p>
+            <div
+              class="waveform ${track.status === 'ready' ? '' : 'waveform-placeholder'}"
+              data-waveform-id="${track.id}"
+              role="img"
+              aria-label="Waveform for ${escapeHtml(track.name)}"
+            >
+              ${getWaveformStatus(track)}
+            </div>
+            <p>${getTrackStatusText(track, audible)}</p>
           </div>
 
           <div class="track-controls">
@@ -97,6 +104,34 @@ export function renderTrackList(
       onTrackChange(track.id, { solo: !track.solo });
     }
   });
+}
+
+function getWaveformStatus(track) {
+  if (track.status === 'loading') {
+    return '<span>Decoding audio...</span>';
+  }
+
+  if (track.status === 'error') {
+    return '<span>Waveform unavailable</span>';
+  }
+
+  return '';
+}
+
+function getTrackStatusText(track, audible) {
+  if (track.status === 'loading') {
+    return 'Loading audio for local decoding.';
+  }
+
+  if (track.status === 'error') {
+    return track.error ?? 'This file could not be decoded.';
+  }
+
+  const channelText = track.channelCount
+    ? `${track.channelCount} channel${track.channelCount === 1 ? '' : 's'}`
+    : 'Audio';
+
+  return `${channelText} - ${audible ? 'audible' : 'muted by mixer state'}`;
 }
 
 function escapeHtml(value) {
