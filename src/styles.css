@@ -1,0 +1,301 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #101416;
+  color: #eef7f6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(29, 48, 51, 0.72), rgba(16, 20, 22, 0.96)),
+    #101416;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+.button:focus-visible,
+.drop-zone:focus-visible {
+  outline: 3px solid #35d7d0;
+  outline-offset: 3px;
+}
+
+.studio-shell {
+  display: grid;
+  gap: 20px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.studio-header,
+.transport-panel,
+.drop-zone,
+.track-row,
+.status-region {
+  border: 1px solid rgba(111, 242, 233, 0.16);
+  background: rgba(19, 26, 29, 0.88);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.26);
+}
+
+.studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 96px;
+  padding: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #7de3dc;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 3rem, 3rem);
+  line-height: 1;
+}
+
+h2 {
+  margin-bottom: 8px;
+  font-size: 1.25rem;
+}
+
+p {
+  color: #aabcbc;
+}
+
+.header-actions,
+.transport-actions,
+.track-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.button,
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 1px solid rgba(126, 227, 220, 0.35);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #1b2528;
+  color: #eef7f6;
+  cursor: pointer;
+}
+
+.button.primary,
+button.primary {
+  border-color: #35d7d0;
+  background: #12a99f;
+  color: #041112;
+  font-weight: 800;
+}
+
+button:disabled,
+.button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.transport-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+}
+
+.time-readout {
+  color: #eef7f6;
+  font-variant-numeric: tabular-nums;
+}
+
+.master-control {
+  display: grid;
+  gap: 6px;
+  min-width: min(240px, 100%);
+}
+
+.meter {
+  position: relative;
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: #273236;
+}
+
+.meter-fill {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #36d7cf, #f5b14c);
+}
+
+.workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.drop-zone {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  border-style: dashed;
+  text-align: center;
+}
+
+.drop-zone.is-dragging {
+  border-color: #35d7d0;
+  background: rgba(18, 169, 159, 0.16);
+}
+
+.track-list {
+  display: grid;
+  gap: 12px;
+}
+
+.track-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 18px;
+  padding: 16px;
+}
+
+.track-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.track-name {
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.waveform-placeholder {
+  min-height: 72px;
+  border: 1px solid rgba(53, 215, 208, 0.18);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(53, 215, 208, 0.12) 0 5px,
+      transparent 5px 14px
+    ),
+    #12191c;
+}
+
+.track-controls {
+  align-content: start;
+}
+
+.control {
+  display: grid;
+  gap: 6px;
+  min-width: 126px;
+  color: #cce0df;
+  font-size: 0.85rem;
+}
+
+.control input[type='range'] {
+  width: 100%;
+  accent-color: #35d7d0;
+}
+
+.toggle-active {
+  border-color: #f5b14c;
+  color: #ffd08a;
+}
+
+.status-region {
+  min-height: 48px;
+  padding: 14px 16px;
+  color: #cce0df;
+}
+
+.toast {
+  margin: 0;
+}
+
+.toast.error {
+  color: #ffbe72;
+}
+
+.toast.success {
+  color: #7de3dc;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 760px) {
+  .studio-shell {
+    padding: 14px;
+  }
+
+  .studio-header,
+  .transport-panel,
+  .track-row {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header-actions,
+  .transport-actions,
+  .track-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .button,
+  button {
+    width: 100%;
+  }
+
+  .control {
+    min-width: 0;
+  }
+}
