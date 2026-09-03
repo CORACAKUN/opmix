@@ -1,6 +1,7 @@
 import './styles.css';
 import WaveSurfer from 'wavesurfer.js';
 import { decodeAudioFile, getAudioContext, resumeAudioContext } from './audio/audio-engine.js';
+import { downloadWav, getExportFilename, renderProjectToWav } from './audio/export-wav.js';
 import { getPeakLevel, isClipping } from './audio/meters.js';
 import { createProjectStore } from './state/project-store.js';
 import { validateAudioFile } from './utils/file-validation.js';
@@ -98,6 +99,8 @@ async function importFiles(fileList) {
 function render() {
   const state = store.getState();
   disposeWaveforms();
+  const canExport =
+    state.status !== 'exporting' && state.tracks.some((track) => track.status === 'ready');
 
   app.innerHTML = `
     <main class="studio-shell" aria-labelledby="app-title">
@@ -115,7 +118,9 @@ function render() {
             accept="audio/*,.mp3,.wav,.ogg,.m4a"
             multiple
           />
-          <button class="button" type="button" disabled>Export WAV</button>
+          <button class="button" type="button" data-export-wav ${canExport ? '' : 'disabled'}>
+            ${state.status === 'exporting' ? 'Exporting...' : 'Export WAV'}
+          </button>
         </div>
       </header>
 
@@ -147,6 +152,7 @@ function render() {
   const transportPanel = app.querySelector('.transport-panel');
   const trackList = app.querySelector('.track-list');
   const statusRegion = app.querySelector('.status-region');
+  const exportButton = app.querySelector('[data-export-wav]');
 
   fileInput.addEventListener('change', (event) => {
     importFiles(event.target.files);
@@ -166,6 +172,10 @@ function render() {
     event.preventDefault();
     dropZone.classList.remove('is-dragging');
     importFiles(event.dataTransfer.files);
+  });
+
+  exportButton.addEventListener('click', () => {
+    exportMix();
   });
 
   renderTransport(transportPanel, {
@@ -217,6 +227,43 @@ function render() {
 
   mountWaveforms(state);
   notifications.render(statusRegion);
+}
+
+async function exportMix() {
+  const state = store.getState();
+
+  if (!state.tracks.some((track) => track.status === 'ready')) {
+    notifications.error('Import a decoded audio track before exporting.');
+    render();
+    return;
+  }
+
+  if (state.status === 'playing') {
+    pause();
+  }
+
+  store.setStatus('exporting');
+  notifications.info('Rendering WAV locally...');
+  render();
+
+  try {
+    const context = getAudioContext();
+    const wavBuffer = await renderProjectToWav({
+      state: store.getState(),
+      runtimeByTrackId: trackRuntime,
+      sampleRate: context.sampleRate,
+    });
+    const filename = getExportFilename();
+
+    downloadWav(wavBuffer, filename);
+    store.setStatus('ready');
+    notifications.success(`Exported ${filename}.`);
+  } catch (error) {
+    store.setStatus('ready');
+    notifications.error(error.message ?? 'WAV export failed.');
+  }
+
+  render();
 }
 
 async function play() {
