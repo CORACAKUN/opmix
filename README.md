@@ -20,7 +20,15 @@ Phase 2 import and waveform:
 - Track removal cleanup for object URLs and waveform instances
 - Import error state for undecodable files
 
-Synchronized playback, metering, and WAV export are planned for later phases.
+Phase 3 transport playback:
+
+- Shared Web Audio context playback
+- Play, pause, stop, and master timeline seek
+- Track start offsets during playback
+- One-shot buffer source recreation on playback restart
+- Visual timer and waveform cursor updates with `requestAnimationFrame`
+
+Metering and WAV export are planned for later phases.
 
 ## Run Locally
 

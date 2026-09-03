@@ -146,6 +146,19 @@ button:disabled,
   min-width: min(240px, 100%);
 }
 
+.timeline-control {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: #cce0df;
+  font-size: 0.85rem;
+}
+
+.timeline-control input {
+  width: min(520px, 100%);
+  accent-color: #35d7d0;
+}
+
 .meter {
   position: relative;
   overflow: hidden;

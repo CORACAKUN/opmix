@@ -1,6 +1,6 @@
 import './styles.css';
 import WaveSurfer from 'wavesurfer.js';
-import { decodeAudioFile } from './audio/audio-engine.js';
+import { decodeAudioFile, getAudioContext, resumeAudioContext } from './audio/audio-engine.js';
 import { createProjectStore } from './state/project-store.js';
 import { validateAudioFile } from './utils/file-validation.js';
 import { formatTime } from './utils/format-time.js';
@@ -11,6 +11,12 @@ import { renderTrackList } from './components/track-view.js';
 const store = createProjectStore();
 const notifications = createNotifications();
 const trackRuntime = new Map();
+const playback = {
+  animationFrameId: null,
+  masterGain: null,
+  startedAtContextTime: 0,
+  startedAtProjectTime: 0,
+};
 
 const app = document.querySelector('#app');
 
@@ -163,7 +169,19 @@ function render() {
     formatTime,
     onMasterVolumeChange: (volume) => {
       store.setMasterVolume(volume);
-      render();
+      updateMasterVolume(volume);
+    },
+    onPlay: () => {
+      play();
+    },
+    onPause: () => {
+      pause();
+    },
+    onStop: () => {
+      stop();
+    },
+    onSeek: (time) => {
+      seek(time);
     },
   });
 
@@ -171,6 +189,10 @@ function render() {
     state,
     formatTime,
     onRemoveTrack: (trackId) => {
+      const wasPlaying = store.getState().status === 'playing';
+      if (wasPlaying) {
+        pause();
+      }
       disposeTrackRuntime(trackId);
       store.removeTrack(trackId);
       notifications.info('Track removed.');
@@ -178,8 +200,12 @@ function render() {
     },
     onTrackChange: (trackId, patch) => {
       store.updateTrack(trackId, patch);
+      updateTrackRuntime(trackId);
 
       if ('muted' in patch || 'solo' in patch || 'offset' in patch) {
+        if (store.getState().status === 'playing') {
+          restartPlaybackAtCurrentTime();
+        }
         render();
       }
     },
@@ -187,6 +213,241 @@ function render() {
 
   mountWaveforms(state);
   notifications.render(statusRegion);
+}
+
+async function play() {
+  const state = store.getState();
+
+  if (!state.tracks.some((track) => track.status === 'ready')) {
+    notifications.error('Import a decoded audio track before playback.');
+    render();
+    return;
+  }
+
+  const context = await resumeAudioContext();
+  stopSources();
+
+  playback.masterGain = context.createGain();
+  playback.masterGain.gain.value = state.masterVolume;
+  playback.masterGain.connect(context.destination);
+  playback.startedAtContextTime = context.currentTime;
+  playback.startedAtProjectTime =
+    state.currentTime >= state.duration ? 0 : state.currentTime;
+
+  const audibleTrackIds = getAudibleTrackIds(state.tracks);
+
+  state.tracks.forEach((track) => {
+    const runtime = trackRuntime.get(track.id);
+
+    if (!runtime?.audioBuffer || !audibleTrackIds.has(track.id)) {
+      return;
+    }
+
+    scheduleTrack(context, track, runtime, playback.startedAtProjectTime);
+  });
+
+  store.setCurrentTime(playback.startedAtProjectTime);
+  store.setStatus('playing');
+  startVisualClock();
+  render();
+}
+
+function pause() {
+  const position = getPlaybackPosition();
+  stopSources();
+  store.setCurrentTime(position);
+  store.setStatus('paused');
+  stopVisualClock();
+  render();
+}
+
+function stop() {
+  stopSources();
+  store.setCurrentTime(0);
+  store.setStatus('ready');
+  stopVisualClock();
+  updateVisualTime(0);
+  render();
+}
+
+function seek(time) {
+  const wasPlaying = store.getState().status === 'playing';
+
+  if (wasPlaying) {
+    stopSources();
+  }
+
+  store.setCurrentTime(time);
+  const currentTime = store.getState().currentTime;
+  updateVisualTime(currentTime);
+  syncWaveformCursors(currentTime);
+
+  if (wasPlaying) {
+    restartPlaybackAtCurrentTime();
+  }
+}
+
+function restartPlaybackAtCurrentTime() {
+  stopSources();
+  store.setStatus('paused');
+  play();
+}
+
+function scheduleTrack(context, track, runtime, projectTime) {
+  const trackStart = track.offset;
+  const trackEnd = track.offset + runtime.audioBuffer.duration;
+
+  if (projectTime >= trackEnd) {
+    return;
+  }
+
+  const source = context.createBufferSource();
+  const gain = context.createGain();
+  const panner = context.createStereoPanner();
+
+  source.buffer = runtime.audioBuffer;
+  gain.gain.value = track.volume;
+  panner.pan.value = track.pan;
+
+  source.connect(gain);
+  gain.connect(panner);
+  panner.connect(playback.masterGain);
+
+  runtime.source = source;
+  runtime.gain = gain;
+  runtime.panner = panner;
+
+  if (projectTime < trackStart) {
+    source.start(context.currentTime + trackStart - projectTime, 0);
+  } else {
+    source.start(context.currentTime, projectTime - trackStart);
+  }
+}
+
+function getAudibleTrackIds(tracks) {
+  const hasSolo = tracks.some((track) => track.solo);
+
+  return new Set(
+    tracks
+      .filter((track) => !track.muted && (!hasSolo || track.solo))
+      .map((track) => track.id),
+  );
+}
+
+function getPlaybackPosition() {
+  const state = store.getState();
+
+  if (state.status !== 'playing') {
+    return state.currentTime;
+  }
+
+  const context = getAudioContext();
+  return Math.min(
+    state.duration,
+    playback.startedAtProjectTime + context.currentTime - playback.startedAtContextTime,
+  );
+}
+
+function startVisualClock() {
+  stopVisualClock();
+
+  function tick() {
+    const position = getPlaybackPosition();
+
+    store.setCurrentTime(position);
+    updateVisualTime(position);
+    syncWaveformCursors(position);
+
+    if (position >= store.getState().duration) {
+      stop();
+      return;
+    }
+
+    playback.animationFrameId = requestAnimationFrame(tick);
+  }
+
+  playback.animationFrameId = requestAnimationFrame(tick);
+}
+
+function stopVisualClock() {
+  if (playback.animationFrameId !== null) {
+    cancelAnimationFrame(playback.animationFrameId);
+    playback.animationFrameId = null;
+  }
+}
+
+function updateVisualTime(position) {
+  const state = store.getState();
+  const currentTime = app.querySelector('[data-current-time]');
+  const timeline = app.querySelector('[data-project-timeline]');
+
+  if (currentTime) {
+    currentTime.textContent = formatTime(position);
+  }
+
+  if (timeline) {
+    timeline.value = String(Math.min(position, state.duration));
+  }
+}
+
+function syncWaveformCursors(projectTime) {
+  store.getState().tracks.forEach((track) => {
+    const runtime = trackRuntime.get(track.id);
+
+    if (!runtime?.waveform || track.status !== 'ready') {
+      return;
+    }
+
+    const trackTime = Math.min(
+      Math.max(projectTime - track.offset, 0),
+      track.duration,
+    );
+
+    runtime.waveform.setTime(trackTime);
+  });
+}
+
+function stopSources() {
+  trackRuntime.forEach((runtime) => {
+    try {
+      runtime.source?.stop();
+    } catch {
+      // BufferSourceNode can only be stopped once.
+    }
+
+    runtime.source?.disconnect();
+    runtime.gain?.disconnect();
+    runtime.panner?.disconnect();
+    runtime.source = null;
+    runtime.gain = null;
+    runtime.panner = null;
+  });
+
+  playback.masterGain?.disconnect();
+  playback.masterGain = null;
+}
+
+function updateMasterVolume(volume) {
+  if (playback.masterGain) {
+    playback.masterGain.gain.value = volume;
+  }
+}
+
+function updateTrackRuntime(trackId) {
+  const runtime = trackRuntime.get(trackId);
+  const track = store.getState().tracks.find((candidate) => candidate.id === trackId);
+
+  if (!runtime || !track) {
+    return;
+  }
+
+  if (runtime.gain) {
+    runtime.gain.gain.value = track.volume;
+  }
+
+  if (runtime.panner) {
+    runtime.panner.pan.value = track.pan;
+  }
 }
 
 function mountWaveforms(state) {
@@ -242,12 +503,23 @@ function disposeTrackRuntime(trackId) {
     return;
   }
 
+  try {
+    runtime.source?.stop();
+  } catch {
+    // BufferSourceNode can only be stopped once.
+  }
+
+  runtime.source?.disconnect();
+  runtime.gain?.disconnect();
+  runtime.panner?.disconnect();
   runtime.waveform?.destroy();
   URL.revokeObjectURL(runtime.objectUrl);
   trackRuntime.delete(trackId);
 }
 
 window.addEventListener('beforeunload', () => {
+  stopSources();
+  stopVisualClock();
   disposeWaveforms();
   trackRuntime.forEach((_, trackId) => disposeTrackRuntime(trackId));
 });
